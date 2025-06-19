@@ -1,0 +1,6 @@
+name: firts workflow
+on: push
+jobs: 
+     first_job:
+     
+ 
