@@ -13,5 +13,9 @@ jobs:
       - name: list files
         run: ls
 
+      - name: create file
+        run: echo "this my first workflow" > file.txt
+
       - name: read files
-        run: cat readme.md
+        run: cat file.txt
+
