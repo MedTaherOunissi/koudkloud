@@ -1,6 +1,17 @@
-name: firts workflow
-on: push
-jobs: 
-     first_job:
-     
- 
+name: first workflow
+
+on:
+  push:
+
+jobs:
+  first_job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: welcome message
+        run: echo "hello world"
+
+      - name: list files
+        run: ls
+
+      - name: read files
+        run: cat readme.md
