@@ -4,17 +4,36 @@ on:
   push:
 
 jobs:
-  firstjob:
+  buildjob:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repo
         uses: actions/checkout@v4
       - name: list liste
         run: ls
-      - name: make script ex
-        run: chmod +x .github/workflows/ascii-script.sh
+      - name: installing cowsay 
+        run: sudo apt install cowsay -y 
 
-      - name: excute script
-        run: .github/workflows/ascii-script.sh
+      - name: excute cowsay 
+        run: cowsay -f dragon "Run for cover I'm dragon RERAW" >> dragon.txt
+      - name: sleep for 30 seconds
+        run: sleep 30
+  testjob:
+    runs-on: ubuntu-latest
+    steps:
+      
+      - name: sleep fo 10 s 
+        run: sleep 10
+      - name: find dragon.txt
+        run: grep -i "dragon" dragon.txt
+
+  deployjob:
+    runs-on: ubuntu-latest
+    steps:
+     
+      - name: sleep for 10 s 
+        run: sleep 10
+      - name: show the file 
+        run: cat dragon.txt
       - name: list liste
         run: ls
