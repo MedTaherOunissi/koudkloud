@@ -13,6 +13,6 @@ jobs:
         run: ls
 
       - name: excute script
-        run: ./ascii-script.sh 
+        run: .github/workflows/ascii-script.sh
       - name: list liste
         run: ls
