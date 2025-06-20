@@ -19,8 +19,11 @@ jobs:
       - name: Execute cowsay 
         run: cowsay -f dragon "Run for cover I'm dragon RERAW" >> dragon.txt
 
-      - name: Sleep for 30 seconds
-        run: sleep 30
+      - name: Upload dragon txt file
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-text-file
+          path: dragon.txt
 
   testjob:
     needs: buildjob
@@ -29,8 +32,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Sleep for 10 seconds
-        run: sleep 10
+      - name: Download dragon txt file
+        uses: actions/download-artifact@v4
+        with:
+          name: dragon-text-file
+          path: .
 
       - name: Find dragon.txt
         run: grep -i "dragon" dragon.txt
@@ -42,8 +48,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Sleep for 10 seconds
-        run: sleep 10
+      - name: Download dragon txt file
+        uses: actions/download-artifact@v4
+        with:
+          name: dragon-text-file
+          path: .
 
       - name: Show the file
         run: cat dragon.txt
