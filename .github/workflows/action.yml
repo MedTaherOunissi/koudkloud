@@ -12,10 +12,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  zap_scan:
+  security_scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Fix permissions
@@ -28,14 +28,14 @@ jobs:
           cmd_options: '-r report.html -w report.md -j report.json'
           fail_action: false
 
-      - name: Find report files recursively
+      - name: Find report files
         run: find . -name "report*"
 
-      - name: List files after scan
+      - name: List directory contents
         run: ls -lah
 
-      - name: Upload Reports
-        if: always()  # This will run even if previous steps fail
+      - name: Upload Security Reports
+        if: ${{ !contains(github.event.head_commit.message, '[skip artifacts]') }}
         uses: actions/upload-artifact@v4
         with:
           name: zap-reports
