@@ -1,51 +1,37 @@
-name: ZAP Baseline Scan
+name: ZAP Security Scan
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-permissions:
-  contents: read
-  security-events: write
-  issues: write
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight
 
 jobs:
-  scan:
+  zap_scan:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/zaproxy/zaproxy:stable
-      options: --user root
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create reports directory
-        run: mkdir -p /zap/wrk/
-
       - name: Run ZAP Baseline Scan
-        run: |
-          zap-baseline.py \
-            -t http://www.vulnweb.com/ \
-            -J /zap/wrk/report.json \
-            -w /zap/wrk/report.md \
-            -r /zap/wrk/report.html \
-            --hook=zap_hooks.py \
-            -d
+        uses: zaproxy/action-baseline@v1
+        with:
+          target: 'http://www.vulnweb.com/'
+          docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
+          cmd_options: '-d -J report.json -w report.md -r report.html'
+          fail_action: false  # Continue even if warnings found
 
-      - name: List generated files
-        run: ls -la /zap/wrk/
-
-      - name: Copy reports to workspace
-        run: cp /zap/wrk/report.* .
-
-      - name: Upload Scan Reports
+      - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
-          name: zap-results
+          name: zap-reports
           path: |
             report.html
             report.json
             report.md
-          retention-days: 3
+          retention-days: 7
+
+      - name: Display Warnings
+        if: always()
+        run: |
+          echo "Scan completed with warnings:"
+          cat report.md || echo "No report generated"
