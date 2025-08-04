@@ -1,5 +1,3 @@
-name: OWASP ZAP Scan
-
 on:
   push:
     branches: [main]
@@ -31,7 +29,6 @@ jobs:
           target: 'http://www.vulnweb.com/'
           fail_action: false
           cmd_options: '-r report_html.html -w report_md.md -j report_json.json'
-        working-directory: ${{ github.workspace }}
 
       - name: List files after scan
         if: always()
