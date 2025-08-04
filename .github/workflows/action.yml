@@ -1,9 +1,10 @@
 name: ZAP Security Scan
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   zap_scan:
