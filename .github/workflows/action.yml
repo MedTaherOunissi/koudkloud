@@ -9,45 +9,18 @@ permissions:
   issues: write
 
 jobs:
-  zap-scan:
+  zap_scan:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      contents: read
-      issues: write
-
+    name: Scan the web application
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Fix permissions on workspace
-        run: sudo chmod -R 777 ${{ github.workspace }}
-
-      - name: Run OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.10.0
+      - name: Checkout
+        uses: actions/checkout@v2
         with:
-          target: 'http://www.vulnweb.com/'
-          fail_action: false
-          cmd_options: '-r report_html.html -w report_md.md -j report_json.json'
-
-      - name: List files after scan
-        if: always()
-        run: ls -lah
-
-      - name: Show Report Contents
-        if: always()
-        run: |
-          cat report_html.html || echo "report_html.html not found or empty"
-          cat report_json.json || echo "report_json.json not found or empty"
-          cat report_md.md || echo "report_md.md not found or empty"
-
-      - name: Upload ZAP Reports
-        if: always()
-        uses: actions/upload-artifact@v4
+          ref: main
+      - name: ZAP Scan
+        uses: zaproxy/action-baseline@v0.6.1
         with:
-          name: zap-scan-reports
-          path: |
-            report_html.html
-            report_json.json
-            report_md.md
-          retention-days: 7
+          docker_name: 'owasp/zap2docker-stable'
+          target: 'http://testphp.vulnweb.com/'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
