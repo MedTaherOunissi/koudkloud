@@ -27,7 +27,7 @@ jobs:
       - name: Run OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
-          target: 'https://www.vulnweb.com'
+          target: 'https://lichess.org/'
           fail_action: false
           cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
 
