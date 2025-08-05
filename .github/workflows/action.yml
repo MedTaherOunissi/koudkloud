@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
 permissions:
   contents: read
   security-events: write
@@ -12,64 +13,48 @@ permissions:
   pull-requests: write
 
 jobs:
-  security_scan:
+  zap-scan-job:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-     zap-scan-job:
-  runs-on: ubuntu-latest
-  permissions:
-    actions: write
-    contents: read
-    issues: write
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'https://www.vulnweb.com'
+          fail_action: false
+          cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
 
-  steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: List Generated Files
+        if: always()
+        run: ls -lah
 
-    - name: Run OWASP ZAP Baseline Scan
-      uses: zaproxy/action-baseline@v0.10.0
-      with:
-        target: 'https://http://www.vulnweb.com'
-        fail_action: false
-        cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+      - name: Show Report Contents
+        if: always()
+        run: |
+          echo "=== report_html.html ==="
+          cat report_html.html || echo "report_html.html not found"
+          echo "=== report_json.json ==="
+          cat report_json.json || echo "report_json.json not found"
+          echo "=== report_md.md ==="
+          cat report_md.md || echo "report_md.md not found"
 
-    - name: List Generated Files
-      if: always()
-      run: ls -lah
+      - name: Upload ZAP Report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap_report  
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 1
 
-    - name: Show Report Contents
-      if: always()
-      run: |
-        echo "=== report_html.html ==="
-        cat report_html.html || echo "report_html.html not found"
-        echo "=== report_json.json ==="
-        cat report_json.json || echo "report_json.json not found"
-        echo "=== report_md.md ==="
-        cat report_md.md || echo "report_md.md not found"
-
-    - name: Upload ZAP Report
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@v4
-      continue-on-error: true
-      with:
-        name: zap_report  
-        path: |
-          report_html.html
-          report_json.json
-          report_md.md
-        retention-days: 1
-
-    - name: Notify Slack
-      if: always()
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        SLACK_TITLE: "OWASP ZAP Scan Report"
-        SLACK_MESSAGE: "✅ ZAP scan completed for https://www.almavivatunisie.com.tn. Reports uploaded as artifacts."
-        SLACK_USERNAME: "GitHub Actions"
-        SLACK_ICON: ":zap:"
-
+      -
