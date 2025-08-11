@@ -141,60 +141,55 @@ jobs:
 #         retention-days: 1
 
   nmap-scan:
-    name: 🗺️ Network Discovery - Nmap
-    runs-on: ubuntu-latest
-    needs: pre-scan-validation
-    if: needs.pre-scan-validation.outputs.target-accessible == 'true'
-    steps:
-      - name: 🔧 Install Nmap
-        run: sudo apt-get update && sudo apt-get install -y nmap
-      
-      - name: 🗺️ Basic Port Scan
-        if: env.SCAN_INTENSITY == 'light'
-        run: |
-          # Extract hostname from URL
-          TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-          
-          nmap -sS -O -sV --top-ports 1000 \
-            -oX nmap-basic.xml \
-            -oN nmap-basic.txt \
-            $TARGET_HOST
-      
-      - name: 🗺️ Comprehensive Scan
-        if: env.SCAN_INTENSITY == 'medium'
-        run: |
-          TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-          
-          nmap -sS -sU -O -sV -sC \
-            --script=vuln,safe,discovery \
-            -p- \
-            -oX nmap-comprehensive.xml \
-            -oN nmap-comprehensive.txt \
-            $TARGET_HOST
-      
-      - name: 🗺️ Intensive Scan with Scripts
-        if: env.SCAN_INTENSITY == 'intensive'
-        run: |
-          TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-          
-          # Full TCP and UDP scan with all NSE scripts
-          nmap -sS -sU -O -sV -sC -A \
-            --script=vuln,malware,exploit,auth,brute \
-            --script-timeout=60s \
-            -p- \
-            -T4 \
-            -oX nmap-intensive.xml \
-            -oN nmap-intensive.txt \
-            $TARGET_HOST
-      
-      - name: Upload Nmap Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: nmap-reports
-          path: |
-            nmap-*.xml
-            nmap-*.txt
+   name: 🗺️ Network Discovery - Nmap
+   runs-on: ubuntu-latest
+   needs: pre-scan-validation
+   steps:
+    - name: 🔧 Install Nmap
+      run: sudo apt-get update && sudo apt-get install -y nmap
+    
+    - name: 🗺️ Basic Port Scan
+      if: env.SCAN_INTENSITY == 'light'
+      run: |
+        TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
+        sudo nmap -sS -O -sV --top-ports 1000 \
+          -oX nmap-basic.xml \
+          -oN nmap-basic.txt \
+          $TARGET_HOST
+    
+    - name: 🗺️ Comprehensive Scan
+      if: env.SCAN_INTENSITY == 'medium'
+      run: |
+        TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
+        sudo nmap -sS -sU -O -sV -sC \
+          --script=vuln,safe,discovery \
+          -p- \
+          -oX nmap-comprehensive.xml \
+          -oN nmap-comprehensive.txt \
+          $TARGET_HOST
+    
+    - name: 🗺️ Intensive Scan with Scripts
+      if: env.SCAN_INTENSITY == 'intensive'
+      run: |
+        TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
+        sudo nmap -sS -sU -O -sV -sC -A \
+          --script=vuln,malware,exploit,auth,brute \
+          --script-timeout=60s \
+          -p- \
+          -T4 \
+          -oX nmap-intensive.xml \
+          -oN nmap-intensive.txt \
+          $TARGET_HOST
+    
+    - name: Upload Nmap Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nmap-reports
+        path: |
+          nmap-*.xml
+          nmap-*.txt
+
 
   sqlmap-scan:
     name: 💉 SQL Injection Testing - SQLMap
@@ -363,39 +358,3 @@ jobs:
           path: |
             sslyze-report.json
             testssl-report.*
-  dependency-vulnerability-check:
-    name: 📦 Dependency Vulnerability Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: 🔍 Retire.js JavaScript Vulnerability Check
-        run: |
-          npm install -g retire
-          
-          if [ -d "Frontend" ]; then
-            cd Frontend
-            retire --outputformat json --outputpath ../retire-report.json || true
-          else
-            echo "No Frontend directory found"
-            echo "{\"data\": [], \"messages\": [\"No JavaScript dependencies found\"]}" > retire-report.json
-          fi
-      
-      - name: 🔍 Safety Python Vulnerability Check
-        run: |
-          pip3 install safety
-          
-          if [ -f "requirements.txt" ]; then
-            safety check --json --output safety-report.json || true
-          else
-            echo "No Python requirements.txt found"
-            echo "{\"vulnerabilities\": [], \"meta\": {\"packages_found\": 0}}" > safety-report.json
-          fi
-      
-      - name: 🔍 Bundler-audit Ruby Vulnerability Check
-        run: |
-          if [ -f "Gemfile" ]; then
-            gem install bundler-audit
-            bundle-audit check --format json --output bundler-audit-report.json || true
-          else
-            echo "No Ruby
