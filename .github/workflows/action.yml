@@ -143,7 +143,6 @@ jobs:
    name: 🎯 Nuclei Vulnerability Scanner
    runs-on: ubuntu-latest
   
-   if: needs.pre-scan-validation.outputs.target-accessible == 'true'
    steps:
     - name: 🔧 Install Nuclei
       run: |
