@@ -72,45 +72,120 @@ jobs:
             exit 1
           fi
 
-  owasp-zap-scan:
-    name: 🕷️ OWASP ZAP Security Scan
+  # owasp-zap-scan:
+#     name: 🕷️ OWASP ZAP Security Scan
+#     runs-on: ubuntu-latest
+#     permissions:
+#      actions: write
+#      contents: read
+#      issues: write
+#
+#     steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v4
+#
+#     - name: Run OWASP ZAP Baseline Scan
+#       if: env.SCAN_INTENSITY == 'light'
+#       uses: zaproxy/action-baseline@v0.10.0
+#       continue-on-error: true
+#       with:
+#         target: ${{ env.TARGET_URL }}
+#         fail_action: false
+#         cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+#
+#     - name: Run OWASP ZAP Full Scan
+#       if: env.SCAN_INTENSITY == 'medium' || env.SCAN_INTENSITY == 'intensive'
+#       uses: zaproxy/action-full-scan@v0.8.0
+#       continue-on-error: true
+#       with:
+#         target: ${{ env.TARGET_URL }}
+#         fail_action: false
+#         cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+#
+#     - name: Run OWASP ZAP API Scan
+#       if: env.SCAN_INTENSITY == 'intensive'
+#       run: |
+#         docker run -v $(pwd):/zap/wrk/:rw \
+#           -t owasp/zap2docker-stable zap-api-scan.py \
+#           -t ${{ env.TARGET_URL }}/api/swagger.json \
+#           -f openapi \
+#           -J zap-api.json \
+#           -r zap-api.html || true
+#
+#     - name: List Generated Files
+#       if: always()
+#       run: ls -lah
+#
+#     - name: Show Report Contents
+#       if: always()
+#       run: |
+#         echo "=== report_html.html ==="
+#         cat report_html.html || echo "report_html.html not found"
+#         echo "=== report_json.json ==="
+#         cat report_json.json || echo "report_json.json not found"
+#         echo "=== report_md.md ==="
+#         cat report_md.md || echo "report_md.md not found"
+#
+#     - name: Upload ZAP Reports
+#       if: always()
+#       continue-on-error: true
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: zap_reports
+#         path: |
+#           report_html.html
+#           report_json.json
+#           report_md.md
+#           zap-api.json
+#           zap-api.html
+#         retention-days: 1
+
+  nuclei-scan:
+    name: 🎯 Nuclei Vulnerability Scanner
     runs-on: ubuntu-latest
-    permissions:
-     actions: write
-     contents: read
-     issues: write
+
+    env:
+     TARGET_URL: http://www.vulnweb.com/
+     SCAN_INTENSITY: medium  # light, medium, intensive
 
     steps:
-    - name: Checkout Code
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Run OWASP ZAP Baseline Scan
+    - name: Install nuclei v3.4.7
+      run: |
+        curl -L -o nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.4.7/nuclei_3.4.7_linux_amd64.zip
+        unzip nuclei.zip
+        chmod +x nuclei
+        sudo mv nuclei /usr/local/bin/
+
+    - name: Update nuclei templates
+      run: nuclei -update-templates
+
+    - name: Basic Nuclei Scan
       if: env.SCAN_INTENSITY == 'light'
-      uses: zaproxy/action-baseline@v0.10.0
-      continue-on-error: true
-      with:
-        target: ${{ env.TARGET_URL }}
-        fail_action: false
-        cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+      run: |
+        nuclei -u ${{ env.TARGET_URL }} \
+          -severity critical,high \
+          -o nuclei-basic.json
 
-    - name: Run OWASP ZAP Full Scan
-      if: env.SCAN_INTENSITY == 'medium' || env.SCAN_INTENSITY == 'intensive'
-      uses: zaproxy/action-full-scan@v0.8.0
-      continue-on-error: true
-      with:
-        target: ${{ env.TARGET_URL }}
-        fail_action: false
-        cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+    - name: Comprehensive Nuclei Scan
+      if: env.SCAN_INTENSITY == 'medium'
+      run: |
+        nuclei -u ${{ env.TARGET_URL }} \
+          -severity critical,high,medium \
+          -tags cve,owasp,misc,config \
+          -o nuclei-comprehensive.json
 
-    - name: Run OWASP ZAP API Scan
+    - name: Intensive Nuclei Scan
       if: env.SCAN_INTENSITY == 'intensive'
       run: |
-        docker run -v $(pwd):/zap/wrk/:rw \
-          -t owasp/zap2docker-stable zap-api-scan.py \
-          -t ${{ env.TARGET_URL }}/api/swagger.json \
-          -f openapi \
-          -J zap-api.json \
-          -r zap-api.html || true
+        nuclei -u ${{ env.TARGET_URL }} \
+          -severity critical,high,medium,low \
+          -tags cve,owasp,misc,config,network,dns \
+          -rate-limit 10 \
+          -bulk-size 25 \
+          -o nuclei-intensive.json
 
     - name: List Generated Files
       if: always()
@@ -119,76 +194,21 @@ jobs:
     - name: Show Report Contents
       if: always()
       run: |
-        echo "=== report_html.html ==="
-        cat report_html.html || echo "report_html.html not found"
-        echo "=== report_json.json ==="
-        cat report_json.json || echo "report_json.json not found"
-        echo "=== report_md.md ==="
-        cat report_md.md || echo "report_md.md not found"
+        echo "=== nuclei-basic.json ==="
+        cat nuclei-basic.json || echo "nuclei-basic.json not found"
+        echo "=== nuclei-comprehensive.json ==="
+        cat nuclei-comprehensive.json || echo "nuclei-comprehensive.json not found"
+        echo "=== nuclei-intensive.json ==="
+        cat nuclei-intensive.json || echo "nuclei-intensive.json not found"
 
-    - name: Upload ZAP Reports
+    - name: Upload Nuclei Reports
       if: always()
       continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
-        name: zap_reports
+        name: nuclei-reports
         path: |
-          report_html.html
-          report_json.json
-          report_md.md
-          zap-api.json
-          zap-api.html
+          nuclei-basic.json
+          nuclei-comprehensive.json
+          nuclei-intensive.json
         retention-days: 1
-  nuclei-scan:
-    name: 🎯 Nuclei Vulnerability Scanner
-    runs-on: ubuntu-latest
-
-    env:
-      TARGET_URL: http://www.vulnweb.com/
-      SCAN_INTENSITY: medium  # Change to light, medium or intensive
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install nuclei v3.4.7
-        run: |
-          curl -L -o nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.4.7/nuclei_3.4.7_linux_amd64.zip
-          unzip nuclei.zip
-          chmod +x nuclei
-          sudo mv nuclei /usr/local/bin/
-
-      - name: Update nuclei templates
-        run: nuclei -update-templates
-
-      - name: Basic Nuclei Scan
-        if: env.SCAN_INTENSITY == 'light'
-        run: |
-          nuclei -u ${{ env.TARGET_URL }} \
-            -severity critical,high \
-            -o nuclei-basic.json
-
-      - name: Comprehensive Nuclei Scan
-        if: env.SCAN_INTENSITY == 'medium'
-        run: |
-          nuclei -u ${{ env.TARGET_URL }} \
-            -severity critical,high,medium \
-            -tags cve,owasp,misc,config \
-            -o nuclei-comprehensive.json
-
-      - name: Intensive Nuclei Scan
-        if: env.SCAN_INTENSITY == 'intensive'
-        run: |
-          nuclei -u ${{ env.TARGET_URL }} \
-            -severity critical,high,medium,low \
-            -tags cve,owasp,misc,config,network,dns \
-            -rate-limit 10 \
-            -bulk-size 25 \
-            -o nuclei-intensive.json
-
-      - name: Upload Nuclei Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: nuclei-reports
-          path: nuclei-*.json
