@@ -1,35 +1,119 @@
-name: ZAP Security Scan
+name: PENTEST Pipeline - DevSecOps
 
 on:
+
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: main
+  workflow_dispatch:
+  
+    inputs:
+      target_environment:
+        description: 'Target Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      scan_intensity:
+        description: 'Scan Intensity'
+        required: true
+        default: 'medium'
+        type: choice
+        options:
+        - light
+        - medium
+        - intensive
+      target_url:
+        description: 'Target URL (optional override)'
+        required: false
+        default: 'http://www.vulnweb.com/'
 
 permissions:
   contents: read
-  security-events: write
   issues: write
-  pull-requests: write
+  security-events: write
+
+env:
+  TARGET_URL: ${{ github.event.inputs.target_url || 'http://www.vulnweb.com/' }}
+  SCAN_INTENSITY: ${{ github.event.inputs.scan_intensity || 'medium' }}
+  ENVIRONMENT: ${{ github.event.inputs.target_environment || 'staging' }}
 
 jobs:
-  dependency-check:
-    name: 📦 Dependency Vulnerability Check
+  pre-scan-validation:
+    name: 🔍 Pre-Scan Validation
     runs-on: ubuntu-latest
+    outputs:
+      target-accessible: ${{ steps.connectivity.outputs.accessible }}
+    steps:
+      - name: 🌐 Check Target Accessibility
+        id: connectivity
+        run: |
+          echo "Testing connectivity to ${{ env.TARGET_URL }}"
+          
+          # Basic connectivity test
+          if curl -f -s -I "${{ env.TARGET_URL }}" > /dev/null; then
+            echo "✅ Target is accessible"
+            echo "accessible=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Target is not accessible"
+            echo "accessible=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: 📋 Environment Check
+        run: |
+          echo "🎯 Target URL: ${{ env.TARGET_URL }}"
+          echo "🔍 Scan Intensity: ${{ env.SCAN_INTENSITY }}"
+          echo "🏗️ Environment: ${{ env.ENVIRONMENT }}"
+          
+          # Prevent accidental production scans
+          if [[ "${{ env.ENVIRONMENT }}" == "production" && "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+            echo "❌ Production scans only allowed via manual dispatch"
+            exit 1
+          fi
+
+  owasp-zap-scan:
+    name: 🕷️ OWASP ZAP Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-scan-validation
+    if: needs.pre-scan-validation.outputs.target-accessible == 'true'
     steps:
       - uses: actions/checkout@v4
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
+      
+      - name: 🕷️ OWASP ZAP Baseline Scan
+        if: env.SCAN_INTENSITY == 'light'
+        uses: zaproxy/action-baseline@v0.10.0
+        continue-on-error: true
         with:
-          project: 'CRM-DEV'
-          path: '.'
-          format: 'ALL'
-          args: >
-            --enableRetired
-            --enableExperimental
-      - name: Upload Dependency Check Results
+          target: ${{ env.TARGET_URL }}
+          fail_action: false
+          cmd_options: '-J zap-baseline.json -r zap-baseline.html -w zap-baseline.md'
+      
+      - name: 🕷️ OWASP ZAP Full Scan
+        if: env.SCAN_INTENSITY == 'medium' || env.SCAN_INTENSITY == 'intensive'
+        uses: zaproxy/action-full-scan@v0.8.0
+        continue-on-error: true
+        with:
+          target: ${{ env.TARGET_URL }}
+          fail_action: false
+          cmd_options: '-J zap-full.json -r zap-full.html -w zap-full.md'
+      
+      - name: 🕷️ OWASP ZAP API Scan
+        if: env.SCAN_INTENSITY == 'intensive'
+        run: |
+          docker run -v $(pwd):/zap/wrk/:rw \
+            -t owasp/zap2docker-stable zap-api-scan.py \
+            -t ${{ env.TARGET_URL }}/api/swagger.json \
+            -f openapi \
+            -J zap-api.json \
+            -r zap-api.html || true
+      
+      - name: Upload ZAP Reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dependency-check-report
-          path: reports/
+          name: zap-reports
+          path: |
+            zap-*.json
+            zap-*.html
+            zap-*.md
