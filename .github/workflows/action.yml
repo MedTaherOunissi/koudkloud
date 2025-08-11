@@ -140,7 +140,7 @@ jobs:
 #           zap-api.html
 #         retention-days: 1
 
- nmap-scan:
+  nmap-scan:
     name: 🗺️ Network Discovery - Nmap
     runs-on: ubuntu-latest
     needs: pre-scan-validation
@@ -196,7 +196,7 @@ jobs:
             nmap-*.xml
             nmap-*.txt
 
-sqlmap-scan:
+  sqlmap-scan:
     name: 💉 SQL Injection Testing - SQLMap
     runs-on: ubuntu-latest
     needs: pre-scan-validation
@@ -238,11 +238,10 @@ sqlmap-scan:
             sqlmap-results/
             sqlmap-forms/
 
-arachni-scan:
+  arachni-scan:
     name: 🕸️ Arachni Web Scanner
     runs-on: ubuntu-latest
     needs: pre-scan-validation
-    if: needs.pre-scan-validation.outputs.target-accessible == 'true' && env.SCAN_INTENSITY != 'light'
     steps:
       - name: 🔧 Install Arachni
         run: |
@@ -275,11 +274,10 @@ arachni-scan:
             arachni-report.json
             arachni-report.afr
 
-w3af-scan:
+  w3af-scan:
     name: 🌐 w3af Web Security Scanner
     runs-on: ubuntu-latest
     needs: pre-scan-validation
-    if: needs.pre-scan-validation.outputs.target-accessible == 'true' && env.SCAN_INTENSITY == 'intensive'
     steps:
       - name: 🔧 Install w3af
         run: |
@@ -327,11 +325,9 @@ w3af-scan:
           name: w3af-reports
           path: w3af/w3af-output.txt
 
-ssl-tls-scan:
+  ssl-tls-scan:
     name: 🔒 SSL/TLS Security - SSLyze
     runs-on: ubuntu-latest
-    needs: pre-scan-validation
-    if: needs.pre-scan-validation.outputs.target-accessible == 'true'
     steps:
       - name: 🔧 Install SSLyze
         run: pip3 install sslyze
@@ -367,7 +363,7 @@ ssl-tls-scan:
           path: |
             sslyze-report.json
             testssl-report.*
-dependency-vulnerability-check:
+  dependency-vulnerability-check:
     name: 📦 Dependency Vulnerability Analysis
     runs-on: ubuntu-latest
     steps:
