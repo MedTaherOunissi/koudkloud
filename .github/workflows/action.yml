@@ -140,15 +140,14 @@ jobs:
           zap-api.html
         retention-days: 1
   nuclei-scan:
-   name: 🎯 Nuclei Vulnerability Scanner
-   runs-on: ubuntu-latest
-  
-   steps:
-    - name: 🔧 Install Nuclei
+    name: 🎯 Nuclei Vulnerability Scanner
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🔧 Install Nuclei v3.4.7
       run: |
-        # Téléchargement du binaire Linux AMD64 directement (v3.2.0)
-        curl -L https://github.com/projectdiscovery/nuclei/releases/download/v3.2.0/nuclei_3.2.0_linux_amd64.tar.gz -o nuclei.tar.gz
-        tar -xzf nuclei.tar.gz
+        curl -L -o nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.4.7/nuclei_3.4.7_linux_amd64.zip
+        unzip nuclei.zip
         chmod +x nuclei
         sudo mv nuclei /usr/local/bin/
 
