@@ -143,45 +143,52 @@ jobs:
     name: 🎯 Nuclei Vulnerability Scanner
     runs-on: ubuntu-latest
 
+    env:
+      TARGET_URL: http://www.vulnweb.com/
+      SCAN_INTENSITY: medium  # Change to light, medium or intensive
+
     steps:
-    - name: 🔧 Install Nuclei v3.4.7
-      run: |
-        curl -L -o nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.4.7/nuclei_3.4.7_linux_amd64.zip
-        unzip nuclei.zip
-        chmod +x nuclei
-        sudo mv nuclei /usr/local/bin/
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: 🔄 Update Nuclei Templates
-      run: nuclei -update-templates
+      - name: Install nuclei v3.4.7
+        run: |
+          curl -L -o nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.4.7/nuclei_3.4.7_linux_amd64.zip
+          unzip nuclei.zip
+          chmod +x nuclei
+          sudo mv nuclei /usr/local/bin/
 
-    - name: 🎯 Basic Nuclei Scan
-      if: env.SCAN_INTENSITY == 'light'
-      run: |
-        nuclei -u ${{ env.TARGET_URL }} \
-          -severity critical,high \
-          -json -o nuclei-basic.json
+      - name: Update nuclei templates
+        run: nuclei -update-templates
 
-    - name: 🎯 Comprehensive Nuclei Scan
-      if: env.SCAN_INTENSITY == 'medium'
-      run: |
-        nuclei -u ${{ env.TARGET_URL }} \
-          -severity critical,high,medium \
-          -tags cve,owasp,misc,config \
-          -json -o nuclei-comprehensive.json
+      - name: Basic Nuclei Scan
+        if: env.SCAN_INTENSITY == 'light'
+        run: |
+          nuclei -u ${{ env.TARGET_URL }} \
+            -severity critical,high \
+            -o nuclei-basic.json
 
-    - name: 🎯 Intensive Nuclei Scan
-      if: env.SCAN_INTENSITY == 'intensive'
-      run: |
-        nuclei -u ${{ env.TARGET_URL }} \
-          -severity critical,high,medium,low \
-          -tags cve,owasp,misc,config,network,dns \
-          -rate-limit 10 \
-          -bulk-size 25 \
-          -json -o nuclei-intensive.json
+      - name: Comprehensive Nuclei Scan
+        if: env.SCAN_INTENSITY == 'medium'
+        run: |
+          nuclei -u ${{ env.TARGET_URL }} \
+            -severity critical,high,medium \
+            -tags cve,owasp,misc,config \
+            -o nuclei-comprehensive.json
 
-    - name: Upload Nuclei Reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: nuclei-reports
-        path: nuclei-*.json
+      - name: Intensive Nuclei Scan
+        if: env.SCAN_INTENSITY == 'intensive'
+        run: |
+          nuclei -u ${{ env.TARGET_URL }} \
+            -severity critical,high,medium,low \
+            -tags cve,owasp,misc,config,network,dns \
+            -rate-limit 10 \
+            -bulk-size 25 \
+            -o nuclei-intensive.json
+
+      - name: Upload Nuclei Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nuclei-reports
+          path: nuclei-*.json
