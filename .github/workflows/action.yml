@@ -2,7 +2,7 @@ name: PENTEST Pipeline - DevSecOps
 
 on:
   push:
-    branches: main
+    branches: [ "main" ]
   workflow_dispatch:
     inputs:
       target_environment:
@@ -26,6 +26,8 @@ on:
         description: 'Target URL (optional override)'
         required: false
         default: 'http://www.vulnweb.com/'
+  schedule:
+    - cron: "0 2 * * 1" # Every Monday at 2:00 AM UTC
 
 permissions:
   contents: read
@@ -115,8 +117,8 @@ jobs:
             sudo nmap -sS -sU -O -sV -sC -A --script=vuln,malware,exploit,auth,brute --script-timeout=60s -p- -T4 -oX nmap-intensive.xml -oN nmap-intensive.txt $TARGET_HOST
           fi
       - name: Upload Nmap Reports
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: nmap-reports
           path: nmap-*.xml
@@ -133,8 +135,8 @@ jobs:
         run: |
           sqlmap -u "${{ env.TARGET_URL }}" --crawl=3 --batch --random-agent --level=3 --risk=2 --output-dir=sqlmap-results || true
       - name: Upload SQLMap Reports
-        uses: actions/upload-artifact@v4
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: sqlmap-reports
           path: sqlmap-results/
@@ -226,3 +228,25 @@ jobs:
             sslyze-report.json
             testssl-report.html
             testssl-report.json
+
+  notify-slack:
+    name: 📣 Notify Slack
+    runs-on: ubuntu-latest
+    needs:
+      - pre-scan-validation
+      - owasp-zap-scan
+      - nmap-scan
+      - sqlmap-scan
+      - arachni-scan
+      - w3af-scan
+      - ssl-tls-scan
+    if: always()
+    steps:
+      - name: 📩 Send Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: "security-team"
+          SLACK_USERNAME: "Pentest Bot"
+          SLACK_TITLE: "Pentest Pipeline Results"
+          SLACK_MESSAGE: "Pentest pipeline has completed. Please review the uploaded reports."
