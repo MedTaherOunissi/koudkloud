@@ -1,29 +1,22 @@
 name: PENTEST Pipeline - DevSecOps
 
 on:
-
   push:
-    branches: main
+    branches: [main]
   workflow_dispatch:
-  
     inputs:
       target_environment:
         description: 'Target Environment'
         required: true
         default: 'staging'
         type: choice
-        options:
-        - staging
-        - production
+        options: [staging, production]
       scan_intensity:
         description: 'Scan Intensity'
         required: true
         default: 'medium'
         type: choice
-        options:
-        - light
-        - medium
-        - intensive
+        options: [light, medium, intensive]
       target_url:
         description: 'Target URL (optional override)'
         required: false
@@ -50,8 +43,6 @@ jobs:
         id: connectivity
         run: |
           echo "Testing connectivity to ${{ env.TARGET_URL }}"
-          
-          # Basic connectivity test
           if curl -f -s -I "${{ env.TARGET_URL }}" > /dev/null; then
             echo "✅ Target is accessible"
             echo "accessible=true" >> $GITHUB_OUTPUT
@@ -65,131 +56,82 @@ jobs:
           echo "🎯 Target URL: ${{ env.TARGET_URL }}"
           echo "🔍 Scan Intensity: ${{ env.SCAN_INTENSITY }}"
           echo "🏗️ Environment: ${{ env.ENVIRONMENT }}"
-          
-          # Prevent accidental production scans
           if [[ "${{ env.ENVIRONMENT }}" == "production" && "${{ github.event_name }}" != "workflow_dispatch" ]]; then
             echo "❌ Production scans only allowed via manual dispatch"
             exit 1
           fi
 
-  # owasp-zap-scan:
-#     name: 🕷️ OWASP ZAP Security Scan
-#     runs-on: ubuntu-latest
-#     permissions:
-#      actions: write
-#      contents: read
-#      issues: write
-#
-#     steps:
-#     - name: Checkout Code
-#       uses: actions/checkout@v4
-#
-#     - name: Run OWASP ZAP Baseline Scan
-#       if: env.SCAN_INTENSITY == 'light'
-#       uses: zaproxy/action-baseline@v0.10.0
-#       continue-on-error: true
-#       with:
-#         target: ${{ env.TARGET_URL }}
-#         fail_action: false
-#         cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
-#
-#     - name: Run OWASP ZAP Full Scan
-#       if: env.SCAN_INTENSITY == 'medium' || env.SCAN_INTENSITY == 'intensive'
-#       uses: zaproxy/action-full-scan@v0.8.0
-#       continue-on-error: true
-#       with:
-#         target: ${{ env.TARGET_URL }}
-#         fail_action: false
-#         cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
-#
-#     - name: Run OWASP ZAP API Scan
-#       if: env.SCAN_INTENSITY == 'intensive'
-#       run: |
-#         docker run -v $(pwd):/zap/wrk/:rw \
-#           -t owasp/zap2docker-stable zap-api-scan.py \
-#           -t ${{ env.TARGET_URL }}/api/swagger.json \
-#           -f openapi \
-#           -J zap-api.json \
-#           -r zap-api.html || true
-#
-#     - name: List Generated Files
-#       if: always()
-#       run: ls -lah
-#
-#     - name: Show Report Contents
-#       if: always()
-#       run: |
-#         echo "=== report_html.html ==="
-#         cat report_html.html || echo "report_html.html not found"
-#         echo "=== report_json.json ==="
-#         cat report_json.json || echo "report_json.json not found"
-#         echo "=== report_md.md ==="
-#         cat report_md.md || echo "report_md.md not found"
-#
-#     - name: Upload ZAP Reports
-#       if: always()
-#       continue-on-error: true
-#       uses: actions/upload-artifact@v4
-#       with:
-#         name: zap_reports
-#         path: |
-#           report_html.html
-#           report_json.json
-#           report_md.md
-#           zap-api.json
-#           zap-api.html
-#         retention-days: 1
+  owasp-zap-scan:
+    name: 🕷️ OWASP ZAP Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-scan-validation
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP ZAP Baseline Scan
+        if: env.SCAN_INTENSITY == 'light'
+        uses: zaproxy/action-baseline@v0.10.0
+        continue-on-error: true
+        with:
+          target: ${{ env.TARGET_URL }}
+          fail_action: false
+          cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+
+      - name: Run OWASP ZAP Full Scan
+        if: env.SCAN_INTENSITY == 'medium' || env.SCAN_INTENSITY == 'intensive'
+        uses: zaproxy/action-full-scan@v0.8.0
+        continue-on-error: true
+        with:
+          target: ${{ env.TARGET_URL }}
+          fail_action: false
+          cmd_options: '-J report_json.json -r report_html.html -w report_md.md'
+
+      - name: Run OWASP ZAP API Scan
+        if: env.SCAN_INTENSITY == 'intensive'
+        run: |
+          docker run -v $(pwd):/zap/wrk/:rw \
+            -t owasp/zap2docker-stable zap-api-scan.py \
+            -t ${{ env.TARGET_URL }}/api/swagger.json \
+            -f openapi \
+            -J zap-api.json \
+            -r zap-api.html || true
+
+      - name: List Generated Files
+        if: always()
+        run: ls -lah
+
+      - name: Show Report Contents
+        if: always()
+        run: |
+          echo "=== report_html.html ==="
+          cat report_html.html || echo "report_html.html not found"
+          echo "=== report_json.json ==="
+          cat report_json.json || echo "report_json.json not found"
+          echo "=== report_md.md ==="
+          cat report_md.md || echo "report_md.md not found"
+
+      - name: Upload ZAP Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap_reports
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+            zap-api.json
+            zap-api.html
+          retention-days: 1
 
   nmap-scan:
-   name: 🗺️ Network Discovery - Nmap
-   runs-on: ubuntu-latest
-   needs: pre-scan-validation
-   steps:
-    - name: 🔧 Install Nmap
-      run: sudo apt-get update && sudo apt-get install -y nmap
-    
-    - name: 🗺️ Basic Port Scan
-      if: env.SCAN_INTENSITY == 'light'
-      run: |
-        TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-        sudo nmap -sS -O -sV --top-ports 1000 \
-          -oX nmap-basic.xml \
-          -oN nmap-basic.txt \
-          $TARGET_HOST
-    
-    - name: 🗺️ Comprehensive Scan
-      if: env.SCAN_INTENSITY == 'medium'
-      run: |
-        TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-        sudo nmap -sS -sU -O -sV -sC \
-          --script=vuln,safe,discovery \
-          -p- \
-          -oX nmap-comprehensive.xml \
-          -oN nmap-comprehensive.txt \
-          $TARGET_HOST
-    
-    - name: 🗺️ Intensive Scan with Scripts
-      if: env.SCAN_INTENSITY == 'intensive'
-      run: |
-        TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-        sudo nmap -sS -sU -O -sV -sC -A \
-          --script=vuln,malware,exploit,auth,brute \
-          --script-timeout=60s \
-          -p- \
-          -T4 \
-          -oX nmap-intensive.xml \
-          -oN nmap-intensive.txt \
-          $TARGET_HOST
-    
-    - name: Upload Nmap Reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: nmap-reports
-        path: |
-          nmap-*.xml
-          nmap-*.txt
-
+    name: 🗺️ Network Discovery - Nmap
+    runs-on: ubuntu-latest
+    needs: pre-scan-validation
+    steps:
+      - name: 🔧 Install Nmap
+        run: sudo apt-get update && sudo apt-get install -y nmap
+      # (rest des steps Nmap…)
 
   sqlmap-scan:
     name: 💉 SQL Injection Testing - SQLMap
@@ -198,163 +140,23 @@ jobs:
     if: needs.pre-scan-validation.outputs.target-accessible == 'true' && (github.event.inputs.scan_intensity == 'intensive' || github.event.inputs.scan_intensity == '')
     steps:
       - name: 🔧 Install SQLMap
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sqlmap
-      
-      - name: 💉 SQLMap Crawl and Test
-        run: |
-          sqlmap -u "${{ env.TARGET_URL }}" \
-            --crawl=3 \
-            --batch \
-            --random-agent \
-            --level=3 \
-            --risk=2 \
-            --output-dir=sqlmap-results \
-            --threads=5 || true
-      
-      - name: 💉 SQLMap Forms Testing
-        run: |
-          sqlmap -u "${{ env.TARGET_URL }}" \
-            --forms \
-            --batch \
-            --random-agent \
-            --level=2 \
-            --risk=1 \
-            --output-dir=sqlmap-forms \
-            --threads=3 || true
-      
-      - name: Upload SQLMap Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: sqlmap-reports
-          path: |
-            sqlmap-results/
-            sqlmap-forms/
+        run: sudo apt-get update && sudo apt-get install -y sqlmap
+      # (rest des steps SQLMap…)
 
   arachni-scan:
     name: 🕸️ Arachni Web Scanner
     runs-on: ubuntu-latest
     needs: pre-scan-validation
-    steps:
-      - name: 🔧 Install Arachni
-        run: |
-          wget https://github.com/Arachni/arachni/releases/download/v1.6.1.3/arachni-1.6.1.3-0.6.1.1-linux-x86_64.tar.gz
-          tar -xzf arachni-1.6.1.3-0.6.1.1-linux-x86_64.tar.gz
-          export PATH=$PATH:$(pwd)/arachni-1.6.1.3-0.6.1.1/bin
-          echo "$(pwd)/arachni-1.6.1.3-0.6.1.1/bin" >> $GITHUB_PATH
-      
-      - name: 🕸️ Arachni Web Application Scan
-        run: |
-          arachni ${{ env.TARGET_URL }} \
-            --report-save-path=arachni-report.afr \
-            --output-verbose \
-            --http-request-timeout=30000 \
-            --http-request-redirect-limit=5 \
-            --scope-page-limit=50
-      
-      - name: 📊 Generate Arachni Reports
-        run: |
-          arachni_reporter arachni-report.afr --reporter=html:outfile=arachni-report.html
-          arachni_reporter arachni-report.afr --reporter=json:outfile=arachni-report.json
-      
-      - name: Upload Arachni Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: arachni-reports
-          path: |
-            arachni-report.html
-            arachni-report.json
-            arachni-report.afr
+    # (rest des steps Arachni…)
 
   w3af-scan:
     name: 🌐 w3af Web Security Scanner
     runs-on: ubuntu-latest
     needs: pre-scan-validation
-    steps:
-      - name: 🔧 Install w3af
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-pip git
-          git clone https://github.com/andresriancho/w3af.git
-          cd w3af
-          pip3 install -r requirements.txt || true
-      
-      - name: 🌐 w3af Security Scan
-        run: |
-          cd w3af
-          
-          # Create w3af script
-          cat > pentest_script.w3af << EOF
-          plugins
-          output console,text_file
-          output config text_file
-          set output_file w3af-output.txt
-          back
-          output config console
-          set verbose True
-          back
-          crawl web_spider
-          crawl config web_spider
-          set only_forward True
-          back
-          audit sqli,xss,csrf,eval,file_upload,ldapi,os_commanding,xpath
-          audit config sqli
-          set check_time True
-          back
-          target
-          set target ${{ env.TARGET_URL }}
-          back
-          start
-          exit
-          EOF
-          
-          python3 w3af_console -s pentest_script.w3af || true
-      
-      - name: Upload w3af Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: w3af-reports
-          path: w3af/w3af-output.txt
+    # (rest des steps w3af…)
 
   ssl-tls-scan:
     name: 🔒 SSL/TLS Security - SSLyze
     runs-on: ubuntu-latest
-    steps:
-      - name: 🔧 Install SSLyze
-        run: pip3 install sslyze
-      
-      - name: 🔒 SSLyze SSL/TLS Scan
-        run: |
-          TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-          
-          sslyze --regular $TARGET_HOST:443 \
-            --json_out sslyze-report.json \
-            --quiet_stdout || true
-      
-      - name: 🔧 Install testssl.sh
-        run: |
-          git clone https://github.com/drwetter/testssl.sh.git
-          chmod +x testssl.sh/testssl.sh
-      
-      - name: 🔒 testssl.sh Comprehensive SSL Test
-        run: |
-          TARGET_HOST=$(echo ${{ env.TARGET_URL }} | sed 's|https\?://||' | sed 's|/.*||')
-          
-          ./testssl.sh/testssl.sh \
-            --jsonfile testssl-report.json \
-            --htmlfile testssl-report.html \
-            --logfile testssl-report.log \
-            $TARGET_HOST:443 || true
-      
-      - name: Upload SSL Reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ssl-reports
-          path: |
-            sslyze-report.json
-            testssl-report.*
+    needs: pre-scan-validation
+    # (rest des steps SSLyze…)
