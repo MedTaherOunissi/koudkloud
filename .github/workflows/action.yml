@@ -25,7 +25,7 @@ on:
       target_url:
         description: 'Target URL (optional override)'
         required: false
-        default: 'http://www.vulnweb.com/'
+        default: 'https://www.almaviva.it/it_IT/'
   schedule:
     - cron: "0 2 * * 1" # Every Monday at 2:00 AM UTC
 
@@ -35,7 +35,7 @@ permissions:
   security-events: write
 
 env:
-  TARGET_URL: ${{ github.event.inputs.target_url || 'http://www.vulnweb.com/' }}
+  TARGET_URL: ${{ github.event.inputs.target_url || 'https://www.almaviva.it/it_IT/' }}
   SCAN_INTENSITY: ${{ github.event.inputs.scan_intensity || 'medium' }}
   ENVIRONMENT: ${{ github.event.inputs.target_environment || 'staging' }}
 
